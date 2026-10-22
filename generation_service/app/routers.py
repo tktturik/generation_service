@@ -1,7 +1,9 @@
 from fastapi import APIRouter, FastAPI, status
 from loguru import logger
 
+from app.api.generate_router.router import generate_router
 from app.api.payment_webhook_router.router import payment_webhook_router
+from app.api.task_router.router import task_router
 from app.api.user_router.router import user_router
 
 health_router = APIRouter()
@@ -26,7 +28,13 @@ def get_routers() -> list[APIRouter]:
     """
     Возвращает список маршрутов для подключения к приложению.
     """
-    return [health_router, payment_webhook_router, user_router]
+    return [
+        health_router,
+        generate_router,
+        payment_webhook_router,
+        task_router,
+        user_router,
+    ]
 
 
 def setup_routers(app: FastAPI) -> None:

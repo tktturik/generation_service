@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import NotFoundError
+from app.core.errors import InsufficientTokensError, NotFoundError
 from app.core.types.ledger_entry_types import LedgerEntry, LedgerEntryKind
 from app.core.types.user_types import User
 from app.database.models.ledger_entry_model import LedgerEntryModel
@@ -40,6 +40,19 @@ class LedgerService:
             kind=LedgerEntryKind.PAYMENT,
             delta=tokens,
             payment_id=payment_id,
+        )
+
+    async def charge(self, user: User, task_id: UUID, amount: int) -> LedgerEntry:
+        """Списывает токены за задачу; user должен быть получен из lock_user.
+        Баланс проверяется по заблокированной строке;
+        при нехватке InsufficientTokensError, списания нет."""
+        if user.balance < amount:
+            raise InsufficientTokensError()
+        return await self._apply(
+            user,
+            kind=LedgerEntryKind.CHARGE,
+            delta=-amount,
+            task_id=task_id,
         )
 
     async def _apply(
