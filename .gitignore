@@ -137,6 +137,7 @@ assistant.md
 .continueignore
 .cursor/
 .design/
+.claude/
 .aider*
 .copilot*
 *.assistant.md
