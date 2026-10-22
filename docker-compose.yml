@@ -36,6 +36,18 @@ services:
     networks:
       - backend-network
 
+  providers:
+    build:
+      context: ./providers
+    container_name: providers
+    env_file:
+      - providers/.env
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+    networks:
+      - backend-network
+
 volumes:
   db-data:
 
