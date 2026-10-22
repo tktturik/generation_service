@@ -1,0 +1,9 @@
+-r requirements.txt
+ruff
+mypy
+bandit
+pytest
+pytest-asyncio
+pytest-cov
+pytest-timeout
+pre-commit

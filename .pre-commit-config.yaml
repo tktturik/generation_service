@@ -1,0 +1,55 @@
+# Запуск: pre-commit run --all-files
+# Установка: pre-commit install
+
+repos:
+  # Базовые проверки
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of file
+      - id: check-yaml
+        name: Check YAML
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+
+  # Ruff: Линтинг + форматирование (очень быстро)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff
+        name: Ruff lint
+        args: [--fix, --exit-non-zero-on-fix, --show-fixes]
+      - id: ruff-format
+        name: Ruff format
+  # MyPy: Типизация (локальный хук, ~30s)
+  - repo: local
+    hooks:
+      - id: mypy
+        name: MyPy type check
+        entry: bash -c 'mypy generation_service/app && mypy providers/app'
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [commit]
+
+  # Pytest: ЮНИТ-тесты только (локальный хук, ~30s)
+  # НЕ запускаем интеграционные тесты здесь!
+  - repo: local
+    hooks:
+      - id: pytest-unit
+        name: Pytest unit tests
+        entry: bash -c 'cd generation_service && pytest tests/unit -q; rc=$?; [ $rc -eq 5 ] && exit 0; exit $rc'
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [commit]
+
+
+default_stages: [commit]
+fail_fast: false

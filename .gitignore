@@ -1,0 +1,157 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Sphinx
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+
+# SageMath
+*.sage.py
+
+# mypy, Pyre
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.ruff_cache/
+
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.staging.local
+.env.production.local
+**/.env
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv
+
+# IDE & Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Database & Data
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+*.sql
+
+# Docker
+docker-compose.override.yml
+
+# Pre-commit & Git
+.pre-commit-state-*.yaml
+.pre-commit-*.backup
+
+# AI Agents & Assistants
+AGENTS.md
+CLAUDE.md
+assistant.md
+.design/
+.continue/
+.continueignore
+.cursor/
+.design/
+.aider*
+.copilot*
+*.assistant.md
+
+# Temporary & System Files
+*.swp
+*.swo
+*~
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Build & Package Management
+.gradle/
+target/
+*.iml
+out/
+.gradle/

@@ -1,0 +1,55 @@
+# Environments / Python
+.env
+.env.*
+venv
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache/
+.env.test
+
+# IDE / RepoFiles
+.github/
+.vscode/
+.idea/
+README.md
+LICENSE
+CHANGELOG.md
+docker-compose*
+Dockerfile*
+.dockerignore
+
+# IDE temp files
+*.swp
+*.swo
+.DS_Store
+
+# Pre-commit
+.pre-commit-config.yaml
+.pre-commit-hooks.yaml
+pyproject.toml
+
+# Test-specific
+conftest.py
+tests/
+pytest.ini
+requirements-dev.txt
+.coverage
+htmlcov/
+.coverage.*
+
+# Agents
+AGENTS.md
+CLAUDE.md
+assistant.md
+.continue/
+.continueignore
+.cursor/
+.aider*
+.copilot*
+*.assistant.md

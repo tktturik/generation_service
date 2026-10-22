@@ -1,0 +1,17 @@
+services:
+  generation_service:
+    build:
+      context: ./generation_service
+      dockerfile: Dockerfile
+    container_name: generation_service
+    env_file:
+      - generation_service/.env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - backend-network
+
+networks:
+  backend-network:
+    driver: bridge
