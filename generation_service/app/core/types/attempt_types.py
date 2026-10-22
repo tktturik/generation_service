@@ -62,3 +62,17 @@ class WebhookStatus(StrEnum):
 class WebhookOutcome(StrEnum):
     APPLIED = "applied"
     IGNORED = "ignored"
+
+
+class OverdueKind(StrEnum):
+    LEASE_EXPIRED = "lease_expired"
+    PROVIDER_TIMEOUT = "provider_timeout"
+
+
+@dataclass(frozen=True, slots=True)
+class OverdueAttempt:
+    attempt_id: UUID
+    kind: OverdueKind
+    # Заполнен только для OverdueKind.LEASE_EXPIRED:
+    # по нему сторож проверяет, что аренда не сменилась
+    lease_until: datetime | None
