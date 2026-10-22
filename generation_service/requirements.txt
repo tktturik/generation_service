@@ -4,6 +4,7 @@ pydantic
 pydantic-settings
 python-dotenv
 loguru
-SQLAlchemy[asyncio]
+SQLAlchemy[asyncio]>=2.1,<2.2
+alembic
 asyncpg
 httpx

@@ -6,11 +6,38 @@ services:
     container_name: generation_service
     env_file:
       - generation_service/.env
+    environment:
+      DB_HOST: postgres
     ports:
       - "8000:8000"
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - backend-network
+
+  db:
+    image: postgres:18
+    container_name: generation_db
+    env_file:
+      - generation_service/.env
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      # $$ — чтобы переменные раскрывались в контейнере, а не compose
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - backend-network
+
+volumes:
+  db-data:
 
 networks:
   backend-network:

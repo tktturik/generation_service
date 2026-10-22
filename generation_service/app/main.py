@@ -12,5 +12,6 @@ if __name__ == "__main__":
         factory=True,
         host=settings.api.host,
         port=settings.api.port,
+        workers=settings.api.workers,
         log_level=settings.api.uc_log_level,
     )
