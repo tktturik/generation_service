@@ -18,7 +18,7 @@ from app.repositories.user_repository import UserRepository
 from app.services.catalog_service import CatalogService
 from app.services.ledger_service import LedgerService
 from app.services.payment_service import PaymentService
-from app.services.task_service import TaskService
+from app.services.task import TaskResultService, TaskService, TaskTransitionService
 from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,23 @@ def get_task_service(
     catalog: Annotated[CatalogService, Depends(get_catalog_service)],
 ) -> TaskService:
     return TaskService(session, ledger, catalog, TaskRepository(), AttemptRepository())
+
+
+def get_task_transition_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    ledger: Annotated[LedgerService, Depends(get_ledger_service)],
+    catalog: Annotated[CatalogService, Depends(get_catalog_service)],
+) -> TaskTransitionService:
+    return TaskTransitionService(
+        session, ledger, catalog, TaskRepository(), AttemptRepository()
+    )
+
+
+def get_task_result_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    transition: Annotated[TaskTransitionService, Depends(get_task_transition_service)],
+) -> TaskResultService:
+    return TaskResultService(session, transition, TaskRepository(), AttemptRepository())
 
 
 async def _read_verified_body(request: Request, secret: str) -> bytes:

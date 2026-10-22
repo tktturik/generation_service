@@ -15,7 +15,7 @@ from app.repositories.user_repository import UserRepository
 from app.services.catalog_service import CatalogService
 from app.services.ledger_service import LedgerService
 from app.services.outbox_service import OutboxService
-from app.services.task_service import TaskService
+from app.services.task import TaskTransitionService, WatchdogService
 
 logger = logging.getLogger(__name__)
 
@@ -75,5 +75,8 @@ class OutboxWorker:
         attempts = AttemptRepository()
         ledger = LedgerService(session, UserRepository(), LedgerEntryRepository())
         catalog = CatalogService(session, ModelRepository(), ModelLegRepository())
-        tasks = TaskService(session, ledger, catalog, TaskRepository(), attempts)
-        return OutboxService(session, attempts, self._client, tasks)
+        transition = TaskTransitionService(
+            session, ledger, catalog, TaskRepository(), attempts
+        )
+        watchdog = WatchdogService(session, transition, attempts)
+        return OutboxService(session, attempts, self._client, watchdog)

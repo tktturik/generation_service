@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.api.dependencies import get_task_service
 from app.api.generate_router.schema import GenerateRequest, GenerateResponse
-from app.services.task_service import TaskService
+from app.services.task import TaskService
 
 generate_router = APIRouter(tags=["generate"])
 

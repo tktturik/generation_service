@@ -13,7 +13,7 @@ from app.repositories.task_repository import TaskRepository
 from app.repositories.user_repository import UserRepository
 from app.services.catalog_service import CatalogService
 from app.services.ledger_service import LedgerService
-from app.services.task_service import TaskService
+from app.services.task import TaskTransitionService, WatchdogService
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +78,11 @@ class WatchdogWorker:
                 candidate.kind,
             )
 
-    def _build_service(self, session: AsyncSession) -> TaskService:
+    def _build_service(self, session: AsyncSession) -> WatchdogService:
         ledger = LedgerService(session, UserRepository(), LedgerEntryRepository())
         catalog = CatalogService(session, ModelRepository(), ModelLegRepository())
-        return TaskService(
-            session, ledger, catalog, TaskRepository(), AttemptRepository()
+        attempts = AttemptRepository()
+        transition = TaskTransitionService(
+            session, ledger, catalog, TaskRepository(), attempts
         )
+        return WatchdogService(session, transition, attempts)

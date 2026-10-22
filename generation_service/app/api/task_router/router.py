@@ -10,7 +10,7 @@ from app.api.task_router.schema import (
     TaskResponse,
 )
 from app.core.types.task_types import TaskDetails
-from app.services.task_service import TaskService
+from app.services.task import TaskService
 
 task_router = APIRouter(prefix="/tasks", tags=["tasks"])
 

@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
-from app.api.dependencies import get_task_service, verify_provider_signature
+from app.api.dependencies import get_task_result_service, verify_provider_signature
 from app.api.provider_webhook_router.schema import (
     ProviderWebhookRequest,
     ProviderWebhookResponse,
 )
 from app.core.types.model_types import Provider
-from app.services.task_service import TaskService
+from app.services.task import TaskResultService
 
 provider_webhook_router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -19,7 +19,7 @@ provider_webhook_router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 async def provider_webhook(
     name: Provider,
     raw_body: Annotated[bytes, Depends(verify_provider_signature)],
-    service: Annotated[TaskService, Depends(get_task_service)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
 ) -> ProviderWebhookResponse:
     # модели тела в сигнатуре нет: иначе FastAPI разберёт JSON до проверки подписи
     try:
