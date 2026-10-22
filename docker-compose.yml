@@ -7,7 +7,7 @@ services:
     env_file:
       - generation_service/.env
     environment:
-      DB_HOST: postgres
+      DB_HOST: db
     ports:
       - "8000:8000"
     restart: unless-stopped

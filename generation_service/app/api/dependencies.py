@@ -13,6 +13,7 @@ from app.repositories.payment_repository import PaymentRepository
 from app.repositories.user_repository import UserRepository
 from app.services.ledger_service import LedgerService
 from app.services.payment_service import PaymentService
+from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,12 @@ def get_payment_service(
     ledger: Annotated[LedgerService, Depends(get_ledger_service)],
 ) -> PaymentService:
     return PaymentService(session, ledger, PaymentRepository())
+
+
+def get_user_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> UserService:
+    return UserService(session, UserRepository(), LedgerEntryRepository())
 
 
 async def verify_payment_signature(request: Request) -> bytes:
