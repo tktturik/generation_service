@@ -151,6 +151,44 @@ class AttemptRepository:
         await session.flush()
         await session.refresh(attempt, attribute_names=["finished_at"])
 
+    async def find_expired_leases(
+        self, session: AsyncSession, limit: int
+    ) -> list[tuple[UUID, datetime]]:
+        # без блокировки, только колонки; предикат совпадает с ix_attempts_lease_until_sending
+        stmt = (
+            select(AttemptModel.id, AttemptModel.lease_until)
+            .where(
+                AttemptModel.status == "sending",
+                AttemptModel.lease_until < func.now(),
+            )
+            .order_by(AttemptModel.lease_until)
+            .limit(limit)
+        )
+        return [(row.id, row.lease_until) for row in await session.execute(stmt)]
+
+    async def find_timed_out(
+        self, session: AsyncSession, provider_timeout: int, limit: int
+    ) -> list[UUID]:
+        # без блокировки, только колонка; предикат совпадает с ix_attempts_sent_at_sent
+        stmt = (
+            select(AttemptModel.id)
+            .where(
+                AttemptModel.status == "sent",
+                AttemptModel.sent_at < func.now() - timedelta(seconds=provider_timeout),
+            )
+            .order_by(AttemptModel.sent_at)
+            .limit(limit)
+        )
+        return list((await session.scalars(stmt)).all())
+
+    async def release_lease(self, session: AsyncSession, attempt: AttemptModel) -> None:
+        """Возвращает попытку в pending. Вызывать только на строке под FOR UPDATE."""
+        attempt.status = "pending"
+        attempt.lease_until = None
+        attempt.lease_expirations = AttemptModel.lease_expirations + 1  # type: ignore[assignment]  # SQL-выражение, счётчик инкрементирует БД
+        await session.flush()
+        await session.refresh(attempt, attribute_names=["lease_expirations"])
+
     async def supersede_live(
         self, session: AsyncSession, task_id: UUID, except_attempt_id: UUID
     ) -> list[UUID]:
