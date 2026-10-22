@@ -3,6 +3,7 @@ from loguru import logger
 
 from app.api.generate_router.router import generate_router
 from app.api.payment_webhook_router.router import payment_webhook_router
+from app.api.provider_webhook_router.router import provider_webhook_router
 from app.api.task_router.router import task_router
 from app.api.user_router.router import user_router
 
@@ -32,6 +33,7 @@ def get_routers() -> list[APIRouter]:
         health_router,
         generate_router,
         payment_webhook_router,
+        provider_webhook_router,
         task_router,
         user_router,
     ]

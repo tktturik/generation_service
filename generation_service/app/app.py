@@ -1,15 +1,20 @@
+import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
+import httpx
 from fastapi import FastAPI
 
+from app.clients.provider_client import ProviderClient
 from app.core.config import settings
+from app.core.types.model_types import Provider
 from app.database.session import create_engine, create_sessionmaker
 from app.exc_handler import setup_exception_handlers
 from app.middleware import setup_middlewares
 from app.routers import setup_routers
+from app.workers.outbox_worker import OutboxWorker
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +22,27 @@ logger = logging.getLogger(__name__)
 async def startup(app: FastAPI) -> None:
     app.state.engine = create_engine(settings.db)
     app.state.sessionmaker = create_sessionmaker(app.state.engine)
+    app.state.http = httpx.AsyncClient(timeout=settings.provider.provider_http_timeout)
+    app.state.provider_client = ProviderClient(
+        app.state.http,
+        {
+            Provider.ALPHA: settings.provider.alpha_url,
+            Provider.BETA: settings.provider.beta_url,
+        },
+    )
+    app.state.outbox_worker = OutboxWorker(
+        app.state.sessionmaker, app.state.provider_client, settings.worker
+    )
+    app.state.outbox_task = asyncio.create_task(app.state.outbox_worker.run())
     logger.info("START Application pid=%s", os.getpid())
 
 
 async def shutdown(app: FastAPI) -> None:
+    app.state.outbox_task.cancel()
+    # отмена задачи воркера: ждём её завершения, CancelledError здесь штатен
+    with suppress(asyncio.CancelledError):
+        await app.state.outbox_task
+    await app.state.http.aclose()
     await app.state.engine.dispose()
     logger.info("FINISH Application pid=%s", os.getpid())
 
