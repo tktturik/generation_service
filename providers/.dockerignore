@@ -1,0 +1,33 @@
+# Environments / Python
+.env
+.env.*
+venv
+.venv
+__pycache__
+*.pyc
+*.egg-info
+.mypy_cache
+.ruff_cache/
+
+# IDE / RepoFiles
+.git
+.gitignore
+.github/
+.vscode/
+.idea/
+README.md
+LICENSE
+CHANGELOG.md
+docker-compose*
+Dockerfile*
+.dockerignore
+
+# IDE temp files
+*.swp
+*.swo
+.DS_Store
+
+# Agents
+AGENTS.md
+CLAUDE.md
+assistant.md
