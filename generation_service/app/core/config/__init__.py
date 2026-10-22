@@ -4,7 +4,9 @@ from app.core.config.settings import (
     DatabaseSettings,
     FastAPISettings,
     LoggerSettings,
+    ProviderSettings,
     SecuritySettings,
+    WorkerSettings,
 )
 
 __all__ = [
@@ -12,6 +14,8 @@ __all__ = [
     "DatabaseSettings",
     "FastAPISettings",
     "LoggerSettings",
+    "ProviderSettings",
     "SecuritySettings",
+    "WorkerSettings",
     "settings",
 ]

@@ -7,7 +7,9 @@ from app.core.config.settings import (
     DatabaseSettings,
     FastAPISettings,
     LoggerSettings,
+    ProviderSettings,
     SecuritySettings,
+    WorkerSettings,
 )
 
 logger = logging.getLogger(__name__)
@@ -19,6 +21,8 @@ SETTINGS_REGISTRY: tuple[type, ...] = (
     LoggerSettings,
     DatabaseSettings,
     SecuritySettings,
+    ProviderSettings,
+    WorkerSettings,
 )
 
 
@@ -60,6 +64,14 @@ class SettingsContainer:
     @property
     def security(self) -> SecuritySettings:
         return self.get(SecuritySettings)
+
+    @property
+    def provider(self) -> ProviderSettings:
+        return self.get(ProviderSettings)
+
+    @property
+    def worker(self) -> WorkerSettings:
+        return self.get(WorkerSettings)
 
 
 settings = SettingsContainer()

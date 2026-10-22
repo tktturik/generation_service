@@ -49,3 +49,27 @@ class TaskRepository:
             select(TaskModel).where(TaskModel.id == task_id).with_for_update(read=True)
         )
         return await session.scalar(stmt)
+
+    async def get_for_update(
+        self, session: AsyncSession, task_id: UUID
+    ) -> TaskModel | None:
+        stmt = (
+            select(TaskModel)
+            .where(TaskModel.id == task_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return await session.scalar(stmt)
+
+    async def finish(
+        self,
+        session: AsyncSession,
+        task: TaskModel,
+        status: str,
+        result_url: str | None,
+    ) -> None:
+        task.status = status
+        task.result_url = result_url
+        task.finished_at = func.now()  # type: ignore[assignment]  # SQL-выражение вместо значения, время берёт БД
+        await session.flush()
+        await session.refresh(task, attribute_names=["finished_at"])

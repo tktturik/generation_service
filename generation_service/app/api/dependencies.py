@@ -63,17 +63,29 @@ def get_task_service(
     return TaskService(session, ledger, catalog, TaskRepository(), AttemptRepository())
 
 
-async def verify_payment_signature(request: Request) -> bytes:
-    """Читает сырое тело и проверяет подпись до разбора JSON.
-
-    Ошибка: InvalidSignatureError.
-    """
+async def _read_verified_body(request: Request, secret: str) -> bytes:
     body = await request.body()
     if not verify_signature(
-        settings.security.payment_webhook_secret,
+        secret,
         body,
         request.headers.get("X-Signature"),
     ):
         logger.warning("signature_invalid path=%s", request.url.path)
         raise InvalidSignatureError()
     return body
+
+
+async def verify_payment_signature(request: Request) -> bytes:
+    """Читает сырое тело и проверяет подпись до разбора JSON.
+
+    Ошибка: InvalidSignatureError.
+    """
+    return await _read_verified_body(request, settings.security.payment_webhook_secret)
+
+
+async def verify_provider_signature(request: Request) -> bytes:
+    """Как verify_payment_signature, но с секретом вебхуков провайдеров.
+
+    Ошибка: InvalidSignatureError.
+    """
+    return await _read_verified_body(request, settings.security.provider_webhook_secret)

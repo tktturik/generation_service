@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from app.core.types.model_types import ModelLeg
+from app.core.types.model_types import ModelLeg, Provider
 
 
 class AttemptStatus(StrEnum):
@@ -30,3 +30,35 @@ class AttemptView:
     created_at: datetime
     sent_at: datetime | None
     finished_at: datetime | None
+
+
+class SendOutcome(StrEnum):
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    TIMEOUT = "timeout"
+
+
+@dataclass(frozen=True, slots=True)
+class SendResult:
+    outcome: SendOutcome
+    external_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimedAttempt:
+    attempt_id: UUID
+    task_id: UUID
+    provider: Provider
+    prompt: str
+    ref_images: tuple[str, ...]
+    lease_until: datetime
+
+
+class WebhookStatus(StrEnum):
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class WebhookOutcome(StrEnum):
+    APPLIED = "applied"
+    IGNORED = "ignored"
