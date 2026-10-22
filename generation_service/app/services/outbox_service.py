@@ -6,7 +6,7 @@ from app.clients.provider_client import ProviderClient
 from app.core.types.attempt_types import ClaimedAttempt, SendOutcome
 from app.core.types.model_types import Provider
 from app.repositories.attempt_repository import AttemptRepository
-from app.services.task_service import TaskService
+from app.services.task import WatchdogService
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +17,12 @@ class OutboxService:
         session: AsyncSession,
         attempts: AttemptRepository,
         client: ProviderClient,
-        tasks: TaskService,
+        watchdog: WatchdogService,
     ) -> None:
         self._session = session
         self._attempts = attempts
         self._client = client
-        self._tasks = tasks
+        self._watchdog = watchdog
 
     async def claim_batch(self, limit: int, lease_seconds: int) -> list[ClaimedAttempt]:
         async with self._session.begin():
@@ -62,7 +62,7 @@ class OutboxService:
             claimed.ref_images,
         )
         if result.outcome is not SendOutcome.ACCEPTED or result.external_id is None:
-            await self._tasks.fail_on_send(claimed.attempt_id, claimed.lease_until)
+            await self._watchdog.fail_on_send(claimed.attempt_id, claimed.lease_until)
             return
 
         async with self._session.begin():
