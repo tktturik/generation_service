@@ -15,6 +15,7 @@ from app.exc_handler import setup_exception_handlers
 from app.middleware import setup_middlewares
 from app.routers import setup_routers
 from app.workers.outbox_worker import OutboxWorker
+from app.workers.watchdog_worker import WatchdogWorker
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +35,19 @@ async def startup(app: FastAPI) -> None:
         app.state.sessionmaker, app.state.provider_client, settings.worker
     )
     app.state.outbox_task = asyncio.create_task(app.state.outbox_worker.run())
+    app.state.watchdog_worker = WatchdogWorker(app.state.sessionmaker, settings.worker)
+    app.state.watchdog_task = asyncio.create_task(app.state.watchdog_worker.run())
     logger.info("START Application pid=%s", os.getpid())
 
 
 async def shutdown(app: FastAPI) -> None:
     app.state.outbox_task.cancel()
-    # отмена задачи воркера: ждём её завершения, CancelledError здесь штатен
+    app.state.watchdog_task.cancel()
+    # отмена задач воркеров: ждём их завершения, CancelledError здесь штатен
     with suppress(asyncio.CancelledError):
         await app.state.outbox_task
+    with suppress(asyncio.CancelledError):
+        await app.state.watchdog_task
     await app.state.http.aclose()
     await app.state.engine.dispose()
     logger.info("FINISH Application pid=%s", os.getpid())
