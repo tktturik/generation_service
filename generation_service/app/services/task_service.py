@@ -9,6 +9,8 @@ from app.core.types.attempt_types import (
     AttemptStatus,
     AttemptView,
     ErrorKind,
+    OverdueAttempt,
+    OverdueKind,
     WebhookOutcome,
     WebhookStatus,
 )
@@ -176,6 +178,129 @@ class TaskService:
         # логи после выхода из транзакции: при откате ничего не пишем
         for level, message, args in events:
             logger.log(level, message, *args)
+
+    async def find_overdue(
+        self, provider_timeout: int, limit: int
+    ) -> list[OverdueAttempt]:
+        """Просроченные попытки без блокировок: сначала аренды, затем таймауты."""
+        async with self._session.begin():
+            expired = await self._attempts.find_expired_leases(self._session, limit)
+            timed_out = await self._attempts.find_timed_out(
+                self._session, provider_timeout, limit
+            )
+        return [
+            OverdueAttempt(attempt_id, OverdueKind.LEASE_EXPIRED, lease_until)
+            for attempt_id, lease_until in expired
+        ] + [
+            OverdueAttempt(attempt_id, OverdueKind.PROVIDER_TIMEOUT, None)
+            for attempt_id in timed_out
+        ]
+
+    async def expire_lease(
+        self, attempt_id: UUID, lease_until: datetime, max_lease_expirations: int
+    ) -> None:
+        """Обрабатывает истёкшую аренду: возврат в pending или technical-отказ.
+
+        Устаревшая аренда или чужое состояние попытки: выход без изменений.
+        """
+        events: list[_Event] = []
+        async with self._session.begin():
+            routing = await self._attempts.get_routing(self._session, attempt_id)
+            if routing is None:
+                # изменений нет, лог до выхода безопасен
+                logger.debug("watchdog_stale attempt_id=%s", attempt_id)
+                return
+            task_id, user_id, _ = routing
+
+            # порядок блокировок: пользователь -> задача -> попытка
+            user = await self._ledger.lock_user(user_id)
+            task = await self._tasks.get_for_update(self._session, task_id)
+            attempt = await self._attempts.get_for_update(self._session, attempt_id)
+            if (
+                task is None
+                or attempt is None
+                or attempt.status != AttemptStatus.SENDING
+                or attempt.lease_until != lease_until
+            ):
+                logger.debug("watchdog_stale attempt_id=%s", attempt_id)
+                return
+
+            if task.status != TaskStatus.RUNNING:
+                # по инварианту невозможно: закрываем попытку без продвижения
+                await self._finish_by_watchdog(attempt, task, events)
+            else:
+                expiration = attempt.lease_expirations + 1
+                events.append(
+                    (
+                        logging.WARNING,
+                        "attempt_lease_expired attempt_id=%s task_id=%s"
+                        " lease_expirations=%s",
+                        (attempt.id, task.id, expiration),
+                    )
+                )
+                if expiration < max_lease_expirations:
+                    await self._attempts.release_lease(self._session, attempt)
+                else:
+                    await self._finish_by_watchdog(attempt, task, events)
+                    await self._advance(
+                        user, task, attempt, ErrorKind.TECHNICAL, events
+                    )
+
+        # логи после выхода из транзакции: при откате ничего не пишем
+        for level, message, args in events:
+            logger.log(level, message, *args)
+
+    async def time_out(self, attempt_id: UUID) -> None:
+        """Закрывает sent-попытку без ответа провайдера как technical.
+
+        Чужое состояние попытки: выход без изменений.
+        """
+        events: list[_Event] = []
+        async with self._session.begin():
+            routing = await self._attempts.get_routing(self._session, attempt_id)
+            if routing is None:
+                logger.debug("watchdog_stale attempt_id=%s", attempt_id)
+                return
+            task_id, user_id, provider = routing
+
+            # порядок блокировок: пользователь -> задача -> попытка
+            user = await self._ledger.lock_user(user_id)
+            task = await self._tasks.get_for_update(self._session, task_id)
+            attempt = await self._attempts.get_for_update(self._session, attempt_id)
+            # sent_at ставится один раз, поэтому второй маркер не нужен
+            if task is None or attempt is None or attempt.status != AttemptStatus.SENT:
+                logger.debug("watchdog_stale attempt_id=%s", attempt_id)
+                return
+
+            events.append(
+                (
+                    logging.WARNING,
+                    "attempt_timed_out attempt_id=%s task_id=%s provider=%s",
+                    (attempt.id, task.id, provider),
+                )
+            )
+            await self._finish_by_watchdog(attempt, task, events)
+            if task.status == TaskStatus.RUNNING:
+                await self._advance(user, task, attempt, ErrorKind.TECHNICAL, events)
+
+        # логи после выхода из транзакции: при откате ничего не пишем
+        for level, message, args in events:
+            logger.log(level, message, *args)
+
+    async def _finish_by_watchdog(
+        self, attempt: AttemptModel, task: TaskModel, events: list[_Event]
+    ) -> None:
+        """Закрывает попытку как failed/technical по решению сторожа."""
+        await self._attempts.finish(
+            self._session, attempt, AttemptStatus.FAILED, ErrorKind.TECHNICAL, None
+        )
+        events.append(
+            (
+                logging.INFO,
+                "attempt_failed task_id=%s attempt_id=%s source=watchdog error_kind=%s",
+                (task.id, attempt.id, ErrorKind.TECHNICAL),
+            )
+        )
 
     async def apply_provider_webhook(
         self,
