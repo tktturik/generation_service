@@ -187,23 +187,58 @@ async def first_leg_task(
 @pytest.fixture
 def wait_task_finished(
     http_client: httpx.AsyncClient,
-) -> Callable[[UUID], Awaitable[dict[str, Any]]]:
-    """Фабрика ожидания: опрос GET /tasks/{id} до статуса не running, дедлайн 30 с.
+) -> Callable[..., Awaitable[dict[str, Any]]]:
+    """Фабрика ожидания: опрос GET /tasks/{id} до статуса не running, дедлайн по умолчанию 30 с.
 
     Опрос с паузой - осознанное исключение из правил тестов (D68).
     """
 
-    async def wait(task_id: UUID) -> dict[str, Any]:
+    async def wait(task_id: UUID, deadline: float = 30) -> dict[str, Any]:
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + 30
+        limit = loop.time() + deadline
         while True:
             response = await http_client.get(f"/tasks/{task_id}")
             response.raise_for_status()
             task = response.json()
             if task["status"] != "running":
                 return task
-            if loop.time() >= deadline:
-                pytest.fail(f"задача {task_id} не завершилась за 30 с, статус {task['status']}")
+            if loop.time() >= limit:
+                pytest.fail(
+                    f"задача {task_id} не завершилась за {deadline} с, статус {task['status']}"
+                )
             await asyncio.sleep(0.5)
 
     return wait
+
+
+@pytest_asyncio.fixture
+async def timed_out_task(
+    last_leg_task: tuple[UUID, UUID],
+    wait_task_finished: Callable[..., Awaitable[dict[str, Any]]],
+    db_engine: AsyncEngine,
+) -> tuple[UUID, UUID, str]:
+    """Задача, закрытая сторожем по таймауту провайдера: (task_id, attempt_id, external_id)."""
+    task_id, attempt_id = last_leg_task
+    await wait_task_finished(task_id, deadline=90)
+    async with db_engine.connect() as conn:
+        external_id = await conn.scalar(
+            text("SELECT external_id FROM attempts WHERE id = :a"), {"a": attempt_id}
+        )
+    return task_id, attempt_id, external_id
+
+
+@pytest.fixture
+def late_completed_webhook(
+    timed_out_task: tuple[UUID, UUID, str],
+    sign_provider_webhook: Callable[[dict[str, Any]], tuple[bytes, dict[str, str]]],
+) -> tuple[bytes, dict[str, str]]:
+    """Подписанный поздний вебхук completed для попытки, уже закрытой сторожем."""
+    _, attempt_id, external_id = timed_out_task
+    return sign_provider_webhook(
+        {
+            "attempt_id": str(attempt_id),
+            "external_id": external_id,
+            "status": "completed",
+            "result_url": f"https://example.test/result-{attempt_id}.png",
+        }
+    )

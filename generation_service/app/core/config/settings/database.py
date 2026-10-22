@@ -4,11 +4,11 @@ from app.core.config.settings.base import BaseAppSettings
 
 
 class DatabaseSettings(BaseAppSettings):
-    db_host: str
+    db_host: str = Field(default="localhost")
     db_port: int = Field(default=5432)
-    db_user: str
-    db_password: str
-    db_name: str
+    db_user: str = Field(default="postgres")
+    db_password: str = Field(default="postgres")
+    db_name: str = Field(default="generation_service")
 
     @property
     def url(self) -> str:
