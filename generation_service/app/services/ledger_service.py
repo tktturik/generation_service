@@ -55,6 +55,15 @@ class LedgerService:
             task_id=task_id,
         )
 
+    async def refund(self, user: User, task_id: UUID, amount: int) -> LedgerEntry:
+        """Возвращает цену задачи; user должен быть получен из lock_user."""
+        return await self._apply(
+            user,
+            kind=LedgerEntryKind.REFUND,
+            delta=amount,
+            task_id=task_id,
+        )
+
     async def _apply(
         self,
         user: User,

@@ -15,6 +15,26 @@ def pick_first_leg(legs: Sequence[ModelLeg], ref_count: int) -> ModelLeg | None:
     return next((leg for leg in legs if leg.max_ref_images >= ref_count), None)
 
 
+def pick_next_leg(
+    legs: Sequence[ModelLeg],
+    after_priority: int,
+    ref_count: int,
+    after_moderation: bool,
+) -> tuple[ModelLeg | None, tuple[ModelLeg, ...]]:
+    """Следующая нога после after_priority, вмещающая ref_count образцов.
+    После модерации ноги с skip_on_moderation пропускаются и возвращаются
+    вторым элементом (для события leg_skipped); первый элемент None, если ноги нет."""
+    skipped: list[ModelLeg] = []
+    for leg in legs:
+        if leg.priority <= after_priority or leg.max_ref_images < ref_count:
+            continue
+        if after_moderation and leg.skip_on_moderation:
+            skipped.append(leg)
+            continue
+        return leg, tuple(skipped)
+    return None, tuple(skipped)
+
+
 class CatalogService:
     """Каталог моделей. Транзакций не открывает:
     вызывается только внутри транзакции вызывающего."""
