@@ -1,55 +1,158 @@
-# FastAPI Backend Starter
+# generation_service
 
-Базовый шаблон сервиса с FastAPI, трейсингом, логированием и метриками.
+Сервис генерации: принимает оплату, создаёт задачи генерации и выполняет их через внешних провайдеров `alpha` и `beta`.
 
-## Инициализация
+Стек: Python 3.13, FastAPI, uvicorn, SQLAlchemy >=2.1,<2.2 (asyncpg), Alembic, httpx, PostgreSQL 18, Docker Compose.
 
-```sh
-python3 -m venv .venv
-source .venv/bin/activate  # На Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-pip freeze > requirements.txt
-pip install -r requirements-dev.txt
-pip freeze > requirements-dev.txt
-pre-commit install
-cp .env.example > .env
+### Структура репозитория
+
+```text
+docker-compose.yml            # стек: сервис, фейк провайдеров, БД
+README.md
+generation_service/           # основной сервис
+├── Dockerfile
+├── requirements.txt, requirements-dev.txt
+├── alembic.ini               # настройки Alembic
+├── pytest.ini
+├── app/
+│   ├── main.py               # запуск (uvicorn)
+│   ├── app.py                # create_app, lifespan: воркеры, клиент провайдера, БД
+│   ├── routers.py            # сборка роутеров, /health
+│   ├── exc_handler.py        # глобальный обработчик ошибок
+│   ├── middleware.py         # логирование запросов
+│   ├── api/                  # HTTP: пакет на роутер (router.py, schema.py), dependencies.py
+│   ├── services/             # бизнес-логика, сервис владеет транзакцией
+│   ├── repositories/         # SQL по сущностям, без коммитов
+│   ├── database/
+│   │   ├── models/           # ORM-модели, файл на сущность
+│   │   ├── session.py        # engine и sessionmaker
+│   │   └── migrations/       # Alembic
+│   │       └── versions/     # файлы миграций
+│   ├── workers/              # фоновые циклы: отправка (outbox_worker.py), сторож (watchdog_worker.py)
+│   ├── clients/              # внешний HTTP: provider_client.py
+│   └── core/                 # общий код, не импортирует другие слои
+│       ├── config/           # настройки из окружения
+│       ├── types/            # dataclass и перечисления
+│       ├── logging/          # настройка логов (log_conf.py)
+│       ├── errors.py         # прикладные исключения
+│       └── signature.py      # проверка HMAC-подписи
+└── tests/                    # e2e-тесты против поднятого стека, conftest.py с фикстурами
+providers/                    # фейк провайдеров alpha и beta
+├── Dockerfile, requirements.txt
+└── app/
+    ├── main.py               # create_app, lifespan
+    ├── routers/              # alpha.py, beta.py (приём задач), control.py (управление поведением)
+    ├── scheduler.py          # приём задач и отложенная доставка вебхука
+    ├── behavior.py           # настраиваемое поведение провайдеров
+    ├── schemas.py            # HTTP-схемы
+    ├── signature.py          # подпись вебхуков
+    └── config/               # settings.py, log_conf.py
 ```
 
-## Запуск локально
+## Запуск
 
-```sh
-python src/main.py
-```
-
-## Разработка
-
-Базовые команды:
-```sh
-ruff check .              # Линтинг
-ruff format .             # Форматирование
-mypy src/                 # Проверка типов
-pytest tests/unit-tests   # Юнит-тесты
-pre-commit run --all-files # Все проверки вручную
-```
-
-**Примечание:** ruff, ruff-format, mypy и unit-тесты запускаются автоматически при `git commit` через pre-commit hooks (`.pre-commit-config.yaml`). Вышеуказанные команды нужны для быстрой проверки перед коммитом.
-
-## Docker
-
-### Прямой запуск контейнера
 
 ```bash
-docker build -t python-base:latest .
-docker run -d --rm -p 8000:8000 --env-file .env --name backend python-base:latest
-
-# Остановка контейнера
-docker stop backend
+cp generation_service/.env.example generation_service/.env
+cp providers/.env.example providers/.env
+docker compose up -d --build
 ```
 
-### docker-compose (рекомендуется)
+`docker compose` миграции не применяет. Их нужно применить отдельным шагом.
+
+## Окружение на хосте
+
+Одно виртуальное окружение для миграций и тестов:
 
 ```bash
-docker compose up -d --build      # Запуск
-docker compose logs -f            # Просмотр логов
-docker compose down               # Остановка
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -r generation_service/requirements-dev.txt
 ```
+
+## Миграции
+
+Миграции Alembic запускаются из каталога `generation_service/` при запущенной БД:
+
+```bash
+cd generation_service
+alembic upgrade head
+```
+
+Добавить новую миграцию:
+
+```bash
+alembic revision -m "<описание>"   # создаёт файл в app/database/migrations/versions/
+# правка созданного файла: upgrade() и downgrade()
+alembic upgrade head
+```
+
+Пример готовой следующей миграции: `app/database/migrations/versions/0002_catalog.py` (каталог поверх начальной схемы `0b9b6bb613a0_init_tables.py`).
+
+Откат последней миграции:
+
+```bash
+alembic downgrade -1
+```
+
+## Тесты
+
+Предусловия: стек поднят через `docker compose up -d --build`, миграции применены и имеется `generation_service/tests/.env.test` с ключами:
+
+- `DB_HOST`;
+- `SERVICE_URL`;
+- `PAYMENT_WEBHOOK_SECRET`;
+- `PROVIDERS_URL`;
+- `PROVIDER_WEBHOOK_SECRET`.
+
+Значения секретов должны совпадать со значениями в `.env`.
+
+Запуск из каталога `generation_service/`:
+
+```bash
+pytest
+```
+
+Четыре теста из ТЗ:
+
+- `tests/test_payment_webhook_once.py` — повторная доставка вебхука оплаты не меняет баланс дважды;
+- `tests/test_refund_once.py` — возврат проводится один раз;
+- `tests/test_leg_fallback.py` — при отказе `alpha` задача уходит на `beta`;
+- `tests/test_late_completed.py` — поздний результат провайдера после таймаута обрабатывается корректно.
+
+Тесты ходят в БД compose напрямую, сами создают и удаляют своих пользователей и сбрасывают поведение фейка провайдеров через `/control`.
+
+Набор выполняется примерно 80 секунд, из них около 70 секунд занимает `test_late_completed.py`: в стеке реальный `PROVIDER_TIMEOUT=60`
+
+## Ровно один раз: начисление
+
+- Подпись вебхука оплаты — HMAC-SHA256 по сырому телу, она проверяется до разбора JSON через `compare_digest`. Неверная подпись даёт 401.
+- Обработка идёт в одной транзакции: блокируется строка пользователя (`FOR UPDATE`), затем `INSERT INTO payments ... ON CONFLICT DO NOTHING RETURNING` по первичному ключу `payment_id`. Если строка вставилась, в той же транзакции пишется строка журнала `payment` и растёт баланс.
+- Дубль получает 200 `duplicate`: ответ не 2xx заставил бы платёжную систему повторять доставку. Неуспешная оплата получает 200 `ignored`.
+- Второй рубеж — частичный уникальный индекс журнала `(payment_id) WHERE kind = 'payment'`.
+- Первичный ключ работает между 4 процессами. Это проверяет тест 1: 20 одновременных вебхуков.
+
+## Ровно один раз: возврат
+
+- На задачу приходится одно списание. Сумма `price_charged` фиксируется в задаче, и возвращается та же сумма.
+- Возврат проводится только вместе с переходом задачи `running → failed`, под блокировками в порядке пользователь → задача → попытка. Статусы перечитываются под блокировкой.
+- Все входы (вебхук `failed`, синхронный отказ при отправке, сторож) ведут в один и тот же переход. Результат и возврат оба требуют статуса `running` под блокировкой задачи, поэтому взаимоисключающи.
+- Второй рубеж — уникальный индекс `(task_id, kind)` для `charge` и `refund`.
+- Баланс — это колонка плюс строка журнала с `balance_after`, обе в одной транзакции.
+- Это проверяет тест 2: 10 одновременных `failed` на последней ноге.
+
+## Падение посреди вебхука
+
+- Обработка вебхука провайдера — одна транзакция. Падение до коммита — это откат: деньги и статусы не изменились.
+- Провайдер повторяет доставку при не 2xx и при обрыве теми же байтами и с той же подписью (1 + 5 попыток, пауза 2 с). Повтор проходит тот же условный переход.
+- Падение после коммита, но до ответа: повтор получает 200 `ignored`, второго движения денег нет.
+- Если вебхук потерян совсем, сторож закрывает попытку по `PROVIDER_TIMEOUT` (60 с) как `technical` и ведёт задачу дальше: на следующую ногу или к одному возврату.
+- Смежный случай: воркер отправки упал между захватом попытки и ответом провайдера. Остаётся `sending` с арендой; сторож возвращает попытку в `pending` с тем же `attempt_id`, провайдер идемпотентен по `attempt_id`. После 3 просрочек аренды попытка закрывается как `technical`.
+
+## Поздний результат
+
+- `completed` принимается, пока задача `running`, от любой её попытки, кроме `completed` и `superseded`, в том числе от попытки, закрытой сторожем. Попытка становится `completed`, задача — `completed` с `result_url`, остальные живые попытки — `superseded`. Возврата не было и не будет.
+- Если задача уже `failed` и возврат сделан, результат игнорируется: ответ 200 `ignored`, деньги не двигаются. Это проверяет тест 4.
+- Почему так: результат и возврат требуют `running` под одной блокировкой задачи, поэтому оба сразу невозможны.
+- Отвергнуто: игнорировать поздний результат всегда (теряется оплаченная работа); принимать всегда и забирать возврат (лишнее движение денег, возможен минус баланса).
+- Цена решения: провайдер мог выполнить задачу зря. Это затраты сервиса, не пользователя.
