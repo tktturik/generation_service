@@ -44,7 +44,7 @@ repos:
     hooks:
       - id: pytest-unit
         name: Pytest unit tests
-        entry: bash -c 'cd generation_service && pytest tests/unit -q; rc=$?; [ $rc -eq 5 ] && exit 0; exit $rc'
+        entry: bash -c 'cd generation_service && pytest tests/ -q; rc=$?; [ $rc -eq 5 ] && exit 0; exit $rc'
         language: system
         types: [python]
         pass_filenames: false
